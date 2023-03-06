@@ -4,37 +4,66 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ConductorOne/baton-expensify/pkg/expensify"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
 
-// TODO: implement your connector here
-type connectorImpl struct {
+var (
+	resourceTypeUser = &v2.ResourceType{
+		Id:          "user",
+		DisplayName: "User",
+		Traits: []v2.ResourceType_Trait{
+			v2.ResourceType_TRAIT_USER,
+		},
+	}
+	resourceTypePolicy = &v2.ResourceType{
+		Id:          "policy",
+		DisplayName: "Policy",
+		Traits: []v2.ResourceType_Trait{
+			v2.ResourceType_TRAIT_GROUP,
+		},
+	}
+)
+
+type Expensify struct {
+	client *expensify.Client
 }
 
-func (c *connectorImpl) ListResourceTypes(ctx context.Context, req *v2.ResourceTypesServiceListResourceTypesRequest) (*v2.ResourceTypesServiceListResourceTypesResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+func (as *Expensify) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
+	return []connectorbuilder.ResourceSyncer{
+		userBuilder(as.client),
+		policyBuilder(as.client),
+	}
 }
 
-func (c *connectorImpl) ListResources(ctx context.Context, req *v2.ResourcesServiceListResourcesRequest) (*v2.ResourcesServiceListResourcesResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+// Metadata returns metadata about the connector.
+func (as *Expensify) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
+	return &v2.ConnectorMetadata{
+		DisplayName: "Expensify",
+	}, nil
 }
 
-func (c *connectorImpl) ListEntitlements(ctx context.Context, req *v2.EntitlementsServiceListEntitlementsRequest) (*v2.EntitlementsServiceListEntitlementsResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+// Validate hits the Expensify API to validate API credentials.
+func (as *Expensify) Validate(ctx context.Context) (annotations.Annotations, error) {
+	_, err := as.client.GetPolicies(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("expensify-connector: %w", err)
+	}
+	return nil, nil
 }
 
-func (c *connectorImpl) ListGrants(ctx context.Context, req *v2.GrantsServiceListGrantsRequest) (*v2.GrantsServiceListGrantsResponse, error) {
-	return nil, fmt.Errorf("not implemented")
-}
+// New returns the Expensify connector.
+func New(ctx context.Context, partnerUserID string, partnerUserSecret string) (*Expensify, error) {
+	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
+	if err != nil {
+		return nil, err
+	}
 
-func (c *connectorImpl) GetMetadata(ctx context.Context, req *v2.ConnectorServiceGetMetadataRequest) (*v2.ConnectorServiceGetMetadataResponse, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (c *connectorImpl) Validate(ctx context.Context, req *v2.ConnectorServiceValidateRequest) (*v2.ConnectorServiceValidateResponse, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (c *connectorImpl) GetAsset(req *v2.AssetServiceGetAssetRequest, server v2.AssetService_GetAssetServer) error {
-	return fmt.Errorf("not implemented")
+	return &Expensify{
+		client: expensify.NewClient(partnerUserID, partnerUserSecret, httpClient),
+	}, nil
 }
