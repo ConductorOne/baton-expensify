@@ -23,9 +23,6 @@ var (
 	resourceTypePolicy = &v2.ResourceType{
 		Id:          "policy",
 		DisplayName: "Policy",
-		Traits: []v2.ResourceType_Trait{
-			v2.ResourceType_TRAIT_GROUP,
-		},
 	}
 )
 

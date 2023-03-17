@@ -62,10 +62,6 @@ type PolicyListResponse struct {
 	ResponseCode int64    `json:"responseCode"`
 }
 
-type Employees struct {
-	Employees []User `json:"employees"`
-}
-
 type PolicyResponse struct {
 	PolicyInfo   map[string]Employees `json:"policyInfo"`
 	ResponseCode int64                `json:"responseCode"`
@@ -90,35 +86,9 @@ func (c *Client) GetPolicies(ctx context.Context) ([]Policy, error) {
 		},
 	}
 
-	strBody, _ := json.Marshal(body)
-	data := url.Values{}
-	data.Set("requestJobDescription", string(strBody))
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, BaseUrl, strings.NewReader(data.Encode()))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var (
-		buf bytes.Buffer
-		r   = io.TeeReader(resp.Body, &buf)
-	)
-
-	var errResp Error
 	var res PolicyListResponse
-	if err = json.NewDecoder(r).Decode(&errResp); err != nil {
-		return nil, err
-	} else if code := errResp.StatusCode; code != 0 && code != http.StatusOK {
-		return nil, fmt.Errorf("error: %s", errResp.Message)
-	}
-
-	if err := json.NewDecoder(&buf).Decode(&res); err != nil {
+	err := c.doRequest(ctx, body, &res)
+	if err != nil {
 		return nil, err
 	}
 	return res.PolicyList, nil
@@ -142,22 +112,32 @@ func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]Use
 		},
 	}
 
-	strBody, err := json.Marshal(body)
+	var res PolicyResponse
+	err := c.doRequest(ctx, body, &res)
 	if err != nil {
 		return nil, err
+	}
+
+	return res.PolicyInfo[policyId].Employees, nil
+}
+
+func (c *Client) doRequest(ctx context.Context, body interface{}, resType interface{}) error {
+	strBody, err := json.Marshal(body)
+	if err != nil {
+		return err
 	}
 
 	data := url.Values{}
 	data.Set("requestJobDescription", string(strBody))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, BaseUrl, strings.NewReader(data.Encode()))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -167,16 +147,15 @@ func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]Use
 	)
 
 	var errResp Error
-	var res PolicyResponse
 	if err = json.NewDecoder(r).Decode(&errResp); err != nil {
-		return nil, err
+		return err
 	} else if code := errResp.StatusCode; code != 0 && code != http.StatusOK {
-		return nil, fmt.Errorf("error: %s", errResp.Message)
+		return fmt.Errorf("error: %s", errResp.Message)
 	}
 
-	if err := json.NewDecoder(&buf).Decode(&res); err != nil {
-		return nil, err
+	if err := json.NewDecoder(&buf).Decode(&resType); err != nil {
+		return err
 	}
 
-	return res.PolicyInfo[policyId].Employees, nil
+	return nil
 }

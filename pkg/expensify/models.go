@@ -14,3 +14,7 @@ type Policy struct {
 	ID             string `json:"id"`
 	Type           string `json:"type"`
 }
+
+type Employees struct {
+	Employees []User `json:"employees"`
+}

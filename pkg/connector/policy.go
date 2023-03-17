@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
-	grant "github.com/conductorone/baton-sdk/pkg/types/grant"
+	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
 
@@ -40,21 +40,13 @@ func policyBuilder(client *expensify.Client) *policyResourceType {
 
 // Create a new connector resource for an Expensify policy.
 func policyResource(ctx context.Context, policy expensify.Policy) (*v2.Resource, error) {
-	profile := make(map[string]interface{})
-	profile["policy_id"] = policy.ID
-	profile["policy_name"] = policy.Name
-	profile["policy_type"] = policy.Type
-
-	groupTrait := []rs.GroupTraitOption{
-		rs.WithGroupProfile(profile),
-	}
 	policyOptions := []rs.ResourceOption{
 		rs.WithAnnotation(
 			&v2.ChildResourceType{ResourceTypeId: resourceTypeUser.Id},
 		),
 	}
 
-	ret, err := rs.NewGroupResource(policy.Name, resourceTypePolicy, policy.ID, groupTrait, policyOptions...)
+	ret, err := rs.NewResource(policy.Name, resourceTypePolicy, policy.ID, policyOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -70,11 +62,11 @@ func (o *policyResourceType) List(ctx context.Context, resourceId *v2.ResourceId
 	}
 
 	for _, policy := range policies {
-		wr, err := policyResource(ctx, policy)
+		pr, err := policyResource(ctx, policy)
 		if err != nil {
 			return nil, "", nil, err
 		}
-		rv = append(rv, wr)
+		rv = append(rv, pr)
 	}
 
 	return rv, "", nil, nil
@@ -96,29 +88,20 @@ func (o *policyResourceType) Entitlements(ctx context.Context, resource *v2.Reso
 }
 
 func (o *policyResourceType) Grants(ctx context.Context, resource *v2.Resource, pt *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	policyTrait, err := rs.GetGroupTrait(resource)
-	if err != nil {
-		return nil, "", nil, err
-	}
-
-	policyId, ok := rs.GetProfileStringValue(policyTrait.Profile, "policy_id")
-	if !ok {
-		return nil, "", nil, fmt.Errorf("error fetching policy_id from policy profile")
-	}
-
-	policyEmployees, err := o.client.GetPolicyEmployees(ctx, policyId)
+	policyEmployees, err := o.client.GetPolicyEmployees(ctx, resource.Id.Resource)
 	if err != nil {
 		return nil, "", nil, err
 	}
 
 	var rv []*v2.Grant
 	for _, policyEmployee := range policyEmployees {
-		roleName := roles[policyEmployee.Role]
-		if roleName == "" {
-			ctxzap.Extract(ctx).Warn("Unknown Expensify Role Name",
+		roleName, ok := roles[policyEmployee.Role]
+		if !ok {
+			ctxzap.Extract(ctx).Warn("Unknown Expensify Role Name, skipping",
 				zap.String("role_name", policyEmployee.Role),
 				zap.String("user", policyEmployee.Email),
 			)
+			continue
 		}
 		policyEmployeeCopy := policyEmployee
 		ur, err := userResource(ctx, &policyEmployeeCopy, resource.Id)
