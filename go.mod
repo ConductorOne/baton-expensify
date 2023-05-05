@@ -1,6 +1,6 @@
-module github.com/ConductorOne/baton-expensify
+module github.com/conductorone/baton-expensify
 
-go 1.19
+go 1.20
 
 require (
 	github.com/conductorone/baton-sdk v0.0.23
