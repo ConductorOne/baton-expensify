@@ -19,6 +19,7 @@ var (
 		Traits: []v2.ResourceType_Trait{
 			v2.ResourceType_TRAIT_USER,
 		},
+		Annotations: annotationsForUserResourceType(),
 	}
 	resourceTypePolicy = &v2.ResourceType{
 		Id:          "policy",
@@ -41,6 +42,7 @@ func (as *Expensify) ResourceSyncers(ctx context.Context) []connectorbuilder.Res
 func (as *Expensify) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
 	return &v2.ConnectorMetadata{
 		DisplayName: "Expensify",
+		Description: "Connector syncing users and policies from Expensify to Baton",
 	}, nil
 }
 
