@@ -5,9 +5,10 @@
 Check out [Baton](https://github.com/conductorone/baton) to learn more the project in general.
 
 # Getting Started
-## Prerequisites
-1. Pair of credentials to use the API. You can find `partnerUserID` and `partnerUserSecret` [here](https://www.expensify.com/tools/integrations)
 
+## Prerequisites
+
+1. Pair of credentials to use the API. You can find `partnerUserID` and `partnerUserSecret` [here](https://www.expensify.com/tools/integrations)
 
 ## brew
 
@@ -37,6 +38,7 @@ baton resources
 # Data Model
 
 `baton-expensify` will pull down information about the following Expensify resources:
+
 - Policies
 - Users
 
@@ -60,13 +62,15 @@ Available Commands:
   help               Help about any command
 
 Flags:
-  -f, --file string                  The path to the c1z file to sync with ($BATON_FILE) (default "sync.c1z")
-  -h, --help                         help for baton-expensify
-      --log-format string            The output format for logs: json, console ($BATON_LOG_FORMAT) (default "json")
-      --log-level string             The log level: debug, info, warn, error ($BATON_LOG_LEVEL) (default "info")
-      --partner-user-id string       The Expensify partner user id used to connect to the Expensify API. ($BATON_PARTNER_USER_ID)
-      --partner-user-secret string   The Expensify partner user secret used to connect to the Expensify API. ($BATON_PARTNER_USER_SECRET)
-  -v, --version                      version for baton-expensify
+      --client-id string              The client ID used to authenticate with ConductorOne ($BATON_CLIENT_ID)
+      --client-secret string          The client secret used to authenticate with ConductorOne ($BATON_CLIENT_SECRET)
+  -f, --file string                   The path to the c1z file to sync with ($BATON_FILE) (default "sync.c1z")
+  -h, --help                          help for baton-expensify
+      --log-format string             The output format for logs: json, console ($BATON_LOG_FORMAT) (default "json")
+      --log-level string              The log level: debug, info, warn, error ($BATON_LOG_LEVEL) (default "info")
+      --partner-user-id string        The Expensify partner user id used to connect to the Expensify API. ($BATON_PARTNER_USER_ID)
+      --partner-user-secret string    The Expensify partner user secret used to connect to the Expensify API. ($BATON_PARTNER_USER_SECRET)
+  -v, --version                       version for baton-expensify
 
 Use "baton-expensify [command] --help" for more information about a command.
 
