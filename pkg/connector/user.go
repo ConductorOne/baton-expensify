@@ -30,6 +30,7 @@ func userResource(ctx context.Context, user *expensify.User, parentResourceID *v
 	userTraitOptions := []rs.UserTraitOption{
 		rs.WithUserProfile(profile),
 		rs.WithEmail(user.Email, true),
+		rs.WithStatus(v2.UserTrait_Status_STATUS_ENABLED),
 	}
 
 	ret, err := rs.NewUserResource(
