@@ -96,9 +96,9 @@ func (c *Client) GetPolicies(ctx context.Context) ([]Policy, error) {
 
 // GetPolicyEmployees returns employees for a signle policy.
 func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]User, error) {
-	var fields, policyIds []string
+	var fields, policyIDs []string
 	fields = append(fields, "employees")
-	policyIds = append(policyIds, policyId)
+	policyIDs = append(policyIDs, policyId)
 	body := PolicyRequestBody{
 		Type: "get",
 		Credentials: Credentials{
@@ -108,7 +108,7 @@ func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]Use
 		InputSettings: PolicyInputSettings{
 			Type:         "policy",
 			Fields:       fields,
-			PolicyIDList: policyIds,
+			PolicyIDList: policyIDs,
 		},
 	}
 
