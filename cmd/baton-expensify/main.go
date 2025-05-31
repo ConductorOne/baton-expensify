@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	cfg "github.com/conductorone/baton-expensify/pkg/config"
 	"github.com/conductorone/baton-expensify/pkg/connector"
-	"github.com/conductorone/baton-sdk/pkg/cli"
+	"github.com/conductorone/baton-sdk/pkg/config"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/types"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -18,15 +19,18 @@ var version = "dev"
 func main() {
 	ctx := context.Background()
 
-	cfg := &config{}
-	cmd, err := cli.NewCmd(ctx, "baton-expensify", cfg, validateConfig, getConnector)
+	_, cmd, err := config.DefineConfiguration(
+		ctx,
+		"baton-expensify",
+		getConnector,
+		cfg.Config,
+	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 
 	cmd.Version = version
-	cmdFlags(cmd)
 
 	err = cmd.Execute()
 	if err != nil {
@@ -35,20 +39,18 @@ func main() {
 	}
 }
 
-func getConnector(ctx context.Context, cfg *config) (types.ConnectorServer, error) {
+func getConnector(ctx context.Context, ec *cfg.Expensify) (types.ConnectorServer, error) {
 	l := ctxzap.Extract(ctx)
 
-	cb, err := connector.New(ctx, cfg.PartnerUserID, cfg.PartnerUserSecret)
+	cb, err := connector.New(ctx, ec.Expensify_user_id, ec.Expensify_user_secret)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err
 	}
-
-	c, err := connectorbuilder.NewConnector(ctx, cb)
+	connector, err := connectorbuilder.NewConnector(ctx, cb)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err
 	}
-
-	return c, nil
+	return connector, nil
 }
