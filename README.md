@@ -76,3 +76,4 @@ Flags:
 
 Use "baton-expensify [command] --help" for more information about a command.
 ```
+
