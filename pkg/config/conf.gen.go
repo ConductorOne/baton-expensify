@@ -4,8 +4,8 @@ package config
 import "reflect" 
 
 type Expensify struct {
-	Expensify_user_id string `mapstructure:"expensify_user_id"`
-	Expensify_user_secret string `mapstructure:"expensify_user_secret"`
+	PartnerUserId string `mapstructure:"partner-user-id"`
+	PartnerUserSecret string `mapstructure:"partner-user-secret"`
 }
 
 func (c* Expensify) findFieldByTag(tagValue string) (any, bool) {
