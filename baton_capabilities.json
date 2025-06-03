@@ -1,0 +1,35 @@
+{
+  "@type":  "type.googleapis.com/c1.connector.v2.ConnectorCapabilities",
+  "resourceTypeCapabilities":  [
+    {
+      "resourceType":  {
+        "id":  "policy",
+        "displayName":  "Policy"
+      },
+      "capabilities":  [
+        "CAPABILITY_SYNC"
+      ]
+    },
+    {
+      "resourceType":  {
+        "id":  "user",
+        "displayName":  "User",
+        "traits":  [
+          "TRAIT_USER"
+        ],
+        "annotations":  [
+          {
+            "@type":  "type.googleapis.com/c1.connector.v2.SkipEntitlementsAndGrants"
+          }
+        ]
+      },
+      "capabilities":  [
+        "CAPABILITY_SYNC"
+      ]
+    }
+  ],
+  "connectorCapabilities":  [
+    "CAPABILITY_SYNC"
+  ],
+  "credentialDetails":  {}
+}
