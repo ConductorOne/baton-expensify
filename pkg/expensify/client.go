@@ -1,30 +1,36 @@
 package expensify
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"strings"
+
+	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
 
 const BaseUrl = "https://integrations.expensify.com/Integration-Server/ExpensifyIntegrations"
 
 type Client struct {
-	httpClient        *http.Client
+	httpClient        *uhttp.BaseHttpClient
 	partnerUserID     string
 	partnerUserSecret string
 }
 
-func NewClient(partnerUserID string, partnerUserSecret string, httpClient *http.Client) *Client {
+func NewClient(ctx context.Context, partnerUserID string, partnerUserSecret string) (*Client, error) {
+	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http client: %w", err)
+	}
+
 	return &Client{
 		partnerUserID:     partnerUserID,
 		partnerUserSecret: partnerUserSecret,
-		httpClient:        httpClient,
-	}
+		httpClient:        uhttp.NewBaseHttpClient(httpClient),
+	}, nil
 }
 
 type Credentials struct {
@@ -60,11 +66,13 @@ type PoliciesRequestBody struct {
 type PolicyListResponse struct {
 	PolicyList   []Policy `json:"policyList"`
 	ResponseCode int64    `json:"responseCode"`
+	NextPage     string   `json:"nextPage"`
 }
 
 type PolicyResponse struct {
 	PolicyInfo   map[string]Employees `json:"policyInfo"`
 	ResponseCode int64                `json:"responseCode"`
+	NextPage     string               `json:"nextPage"`
 }
 
 type Error struct {
@@ -74,27 +82,39 @@ type Error struct {
 
 // GetPolicies returns policies that user is an admin of.
 func (c *Client) GetPolicies(ctx context.Context) ([]Policy, error) {
-	body := PoliciesRequestBody{
-		Type: "get",
-		Credentials: Credentials{
-			PartnerUserID:     c.partnerUserID,
-			PartnerUserSecret: c.partnerUserSecret,
-		},
-		InputSettings: PoliciesInputSettings{
-			Type:      "policyList",
-			AdminOnly: true,
-		},
+	var allPolicies []Policy
+	nextPage := "initial"
+
+	for nextPage != "" {
+		body := PoliciesRequestBody{
+			Type: "get",
+			Credentials: Credentials{
+				PartnerUserID:     c.partnerUserID,
+				PartnerUserSecret: c.partnerUserSecret,
+			},
+			InputSettings: PoliciesInputSettings{
+				Type:      "policyList",
+				AdminOnly: true,
+			},
+		}
+
+		var res PolicyListResponse
+		rl := &v2.RateLimitDescription{}
+		err := c.doRequest(ctx, body, &res, rl)
+		if err != nil {
+			return nil, err
+		}
+
+		allPolicies = append(allPolicies, res.PolicyList...)
+
+		// For testing: always return a next page to force continuous API calls. TODO [mb] remove this.
+		nextPage = "next-page-token"
 	}
 
-	var res PolicyListResponse
-	err := c.doRequest(ctx, body, &res)
-	if err != nil {
-		return nil, err
-	}
-	return res.PolicyList, nil
+	return allPolicies, nil
 }
 
-// GetPolicyEmployees returns employees for a signle policy.
+// GetPolicyEmployees returns employees for a single policy.
 func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]User, error) {
 	var fields, policyIDs []string
 	fields = append(fields, "employees")
@@ -113,7 +133,8 @@ func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]Use
 	}
 
 	var res PolicyResponse
-	err := c.doRequest(ctx, body, &res)
+	rl := &v2.RateLimitDescription{}
+	err := c.doRequest(ctx, body, &res, rl)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +142,7 @@ func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]Use
 	return res.PolicyInfo[policyId].Employees, nil
 }
 
-func (c *Client) doRequest(ctx context.Context, body interface{}, resType interface{}) error {
+func (c *Client) doRequest(ctx context.Context, body interface{}, resType interface{}, rl *v2.RateLimitDescription) error {
 	strBody, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -129,33 +150,28 @@ func (c *Client) doRequest(ctx context.Context, body interface{}, resType interf
 
 	data := url.Values{}
 	data.Set("requestJobDescription", string(strBody))
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, BaseUrl, strings.NewReader(data.Encode()))
+
+	apiURL, err := url.Parse(BaseUrl)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse base URL: %w", err)
 	}
 
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := c.httpClient.Do(req)
+	req, err := c.httpClient.NewRequest(
+		ctx,
+		http.MethodPost,
+		apiURL,
+		uhttp.WithContentTypeFormHeader(),
+		uhttp.WithFormBody(data.Encode()),
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req, uhttp.WithAlwaysJSONResponse(&resType), uhttp.WithRatelimitData(rl))
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
-
-	var (
-		buf bytes.Buffer
-		r   = io.TeeReader(resp.Body, &buf)
-	)
-
-	var errResp Error
-	if err = json.NewDecoder(r).Decode(&errResp); err != nil {
-		return err
-	} else if code := errResp.StatusCode; code != 0 && code != http.StatusOK {
-		return fmt.Errorf("error: %s", errResp.Message)
-	}
-
-	if err := json.NewDecoder(&buf).Decode(&resType); err != nil {
-		return err
-	}
 
 	return nil
 }

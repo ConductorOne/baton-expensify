@@ -8,8 +8,6 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/uhttp"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
 
 var (
@@ -57,12 +55,12 @@ func (as *Expensify) Validate(ctx context.Context) (annotations.Annotations, err
 
 // New returns the Expensify connector.
 func New(ctx context.Context, partnerUserID string, partnerUserSecret string) (*Expensify, error) {
-	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
+	client, err := expensify.NewClient(ctx, partnerUserID, partnerUserSecret)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create expensify client: %w", err)
 	}
 
 	return &Expensify{
-		client: expensify.NewClient(partnerUserID, partnerUserSecret, httpClient),
+		client: client,
 	}, nil
 }
