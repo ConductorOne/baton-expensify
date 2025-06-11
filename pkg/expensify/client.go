@@ -81,41 +81,38 @@ type Error struct {
 }
 
 // GetPolicies returns policies that user is an admin of.
-func (c *Client) GetPolicies(ctx context.Context) ([]Policy, error) {
+func (c *Client) GetPolicies(ctx context.Context, pageToken string) ([]Policy, string, error) {
 	var allPolicies []Policy
-	nextPage := "initial"
 
-	for nextPage != "" {
-		body := PoliciesRequestBody{
-			Type: "get",
-			Credentials: Credentials{
-				PartnerUserID:     c.partnerUserID,
-				PartnerUserSecret: c.partnerUserSecret,
-			},
-			InputSettings: PoliciesInputSettings{
-				Type:      "policyList",
-				AdminOnly: true,
-			},
-		}
-
-		var res PolicyListResponse
-		rl := &v2.RateLimitDescription{}
-		err := c.doRequest(ctx, body, &res, rl)
-		if err != nil {
-			return nil, err
-		}
-
-		allPolicies = append(allPolicies, res.PolicyList...)
-
-		// For testing: always return a next page to force continuous API calls. TODO [mb] remove this.
-		nextPage = "next-page-token"
+	body := PoliciesRequestBody{
+		Type: "get",
+		Credentials: Credentials{
+			PartnerUserID:     c.partnerUserID,
+			PartnerUserSecret: c.partnerUserSecret,
+		},
+		InputSettings: PoliciesInputSettings{
+			Type:      "policyList",
+			AdminOnly: true,
+		},
 	}
 
-	return allPolicies, nil
+	var res PolicyListResponse
+	rl := &v2.RateLimitDescription{}
+	err := c.doRequest(ctx, body, &res, rl)
+	if err != nil {
+		return nil, "", err
+	}
+
+	allPolicies = append(allPolicies, res.PolicyList...)
+
+	// For testing: always return a next page to force continuous API calls. TODO [mb] remove this.
+	nextPage := "next-page-token"
+
+	return allPolicies, nextPage, nil
 }
 
 // GetPolicyEmployees returns employees for a single policy.
-func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]User, error) {
+func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string, pageToken string) ([]User, string, error) {
 	var fields, policyIDs []string
 	fields = append(fields, "employees")
 	policyIDs = append(policyIDs, policyId)
@@ -136,10 +133,13 @@ func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]Use
 	rl := &v2.RateLimitDescription{}
 	err := c.doRequest(ctx, body, &res, rl)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return res.PolicyInfo[policyId].Employees, nil
+	// For testing: always return a next page to force continuous API calls. TODO [mb] remove this.
+	nextPage := "next-page-token"
+
+	return res.PolicyInfo[policyId].Employees, nextPage, nil
 }
 
 func (c *Client) doRequest(ctx context.Context, body interface{}, resType interface{}, rl *v2.RateLimitDescription) error {

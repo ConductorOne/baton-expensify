@@ -56,7 +56,19 @@ func policyResource(ctx context.Context, policy expensify.Policy) (*v2.Resource,
 
 func (o *policyResourceType) List(ctx context.Context, resourceId *v2.ResourceId, pt *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
-	policies, err := o.client.GetPolicies(ctx)
+
+	// Create a new pagination bag to handle the page token
+	bag := &pagination.Bag{}
+	if pt != nil {
+		if err := bag.Unmarshal(pt.Token); err != nil {
+			return nil, "", nil, fmt.Errorf("failed to unmarshal pagination token: %w", err)
+		}
+	}
+
+	// Get the current page token if it exists
+	pageToken := bag.PageToken()
+
+	policies, nextPage, err := o.client.GetPolicies(ctx, pageToken)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -69,7 +81,19 @@ func (o *policyResourceType) List(ctx context.Context, resourceId *v2.ResourceId
 		rv = append(rv, pr)
 	}
 
-	return rv, "", nil, nil
+	// If there's a next page, update the pagination bag
+	var nextToken string
+	if nextPage != "" {
+		if err := bag.Next(nextPage); err != nil {
+			return nil, "", nil, fmt.Errorf("failed to set next page token: %w", err)
+		}
+		nextToken, err = bag.Marshal()
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("failed to marshal pagination token: %w", err)
+		}
+	}
+
+	return rv, nextToken, nil, nil
 }
 
 func (o *policyResourceType) Entitlements(ctx context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
@@ -88,7 +112,18 @@ func (o *policyResourceType) Entitlements(ctx context.Context, resource *v2.Reso
 }
 
 func (o *policyResourceType) Grants(ctx context.Context, resource *v2.Resource, pt *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	policyEmployees, err := o.client.GetPolicyEmployees(ctx, resource.Id.Resource)
+	// Create a new pagination bag to handle the page token
+	bag := &pagination.Bag{}
+	if pt != nil {
+		if err := bag.Unmarshal(pt.Token); err != nil {
+			return nil, "", nil, fmt.Errorf("failed to unmarshal pagination token: %w", err)
+		}
+	}
+
+	// Get the current page token if it exists
+	pageToken := bag.PageToken()
+
+	policyEmployees, nextPage, err := o.client.GetPolicyEmployees(ctx, resource.Id.Resource, pageToken)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -113,5 +148,17 @@ func (o *policyResourceType) Grants(ctx context.Context, resource *v2.Resource, 
 		rv = append(rv, permissionGrant)
 	}
 
-	return rv, "", nil, nil
+	// If there's a next page, update the pagination bag
+	var nextToken string
+	if nextPage != "" {
+		if err := bag.Next(nextPage); err != nil {
+			return nil, "", nil, fmt.Errorf("failed to set next page token: %w", err)
+		}
+		nextToken, err = bag.Marshal()
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("failed to marshal pagination token: %w", err)
+		}
+	}
+
+	return rv, nextToken, nil, nil
 }
