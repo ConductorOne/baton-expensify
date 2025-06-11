@@ -49,24 +49,14 @@ func userResource(ctx context.Context, user *expensify.User, parentResourceID *v
 }
 
 func (o *userResourceType) List(ctx context.Context, parentId *v2.ResourceId, token *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+	nextPage := token.Token + "1"
 	if parentId == nil {
-		return nil, "", nil, nil
+		return nil, nextPage, nil, nil
 	}
 
-	// Create a new pagination bag to handle the page token
-	bag := &pagination.Bag{}
-	if token != nil {
-		if err := bag.Unmarshal(token.Token); err != nil {
-			return nil, "", nil, fmt.Errorf("failed to unmarshal pagination token: %w", err)
-		}
-	}
-
-	// Get the current page token if it exists
-	pageToken := bag.PageToken()
-
-	users, nextPage, err := o.client.GetPolicyEmployees(ctx, parentId.Resource, pageToken)
+	users, err := o.client.GetPolicyEmployees(ctx, parentId.Resource)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("expensify-connector: failed to list users: %w", err)
+		return nil, nextPage, nil, fmt.Errorf("expensify-connector: failed to list users: %w", err)
 	}
 
 	var rv []*v2.Resource
@@ -74,24 +64,12 @@ func (o *userResourceType) List(ctx context.Context, parentId *v2.ResourceId, to
 		userCopy := user
 		ur, err := userResource(ctx, &userCopy, parentId)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nextPage, nil, err
 		}
 		rv = append(rv, ur)
 	}
 
-	// If there's a next page, update the pagination bag
-	var nextToken string
-	if nextPage != "" {
-		if err := bag.Next(nextPage); err != nil {
-			return nil, "", nil, fmt.Errorf("failed to set next page token: %w", err)
-		}
-		nextToken, err = bag.Marshal()
-		if err != nil {
-			return nil, "", nil, fmt.Errorf("failed to marshal pagination token: %w", err)
-		}
-	}
-
-	return rv, nextToken, nil, nil
+	return rv, nextPage, nil, nil
 }
 
 func (o *userResourceType) Entitlements(_ context.Context, _ *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {

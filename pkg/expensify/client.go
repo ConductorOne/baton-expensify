@@ -81,9 +81,7 @@ type Error struct {
 }
 
 // GetPolicies returns policies that user is an admin of.
-func (c *Client) GetPolicies(ctx context.Context, pageToken string) ([]Policy, string, error) {
-	var allPolicies []Policy
-
+func (c *Client) GetPolicies(ctx context.Context) ([]Policy, error) {
 	body := PoliciesRequestBody{
 		Type: "get",
 		Credentials: Credentials{
@@ -100,19 +98,14 @@ func (c *Client) GetPolicies(ctx context.Context, pageToken string) ([]Policy, s
 	rl := &v2.RateLimitDescription{}
 	err := c.doRequest(ctx, body, &res, rl)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	allPolicies = append(allPolicies, res.PolicyList...)
-
-	// For testing: always return a next page to force continuous API calls. TODO [mb] remove this.
-	nextPage := "next-page-token"
-
-	return allPolicies, nextPage, nil
+	return res.PolicyList, nil
 }
 
 // GetPolicyEmployees returns employees for a single policy.
-func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string, pageToken string) ([]User, string, error) {
+func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]User, error) {
 	var fields, policyIDs []string
 	fields = append(fields, "employees")
 	policyIDs = append(policyIDs, policyId)
@@ -133,13 +126,10 @@ func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string, pageTo
 	rl := &v2.RateLimitDescription{}
 	err := c.doRequest(ctx, body, &res, rl)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	// For testing: always return a next page to force continuous API calls. TODO [mb] remove this.
-	nextPage := "next-page-token"
-
-	return res.PolicyInfo[policyId].Employees, nextPage, nil
+	return res.PolicyInfo[policyId].Employees, nil
 }
 
 func (c *Client) doRequest(ctx context.Context, body interface{}, resType interface{}, rl *v2.RateLimitDescription) error {
