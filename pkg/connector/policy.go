@@ -57,21 +57,20 @@ func policyResource(ctx context.Context, policy expensify.Policy) (*v2.Resource,
 func (o *policyResourceType) List(ctx context.Context, resourceId *v2.ResourceId, pt *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
 	policies, err := o.client.GetPolicies(ctx)
-	nextPage := pt.Token + "1"
 
 	if err != nil {
-		return nil, nextPage, nil, err
+		return nil, "", nil, err
 	}
 
 	for _, policy := range policies {
 		pr, err := policyResource(ctx, policy)
 		if err != nil {
-			return nil, nextPage, nil, err
+			return nil, "", nil, err
 		}
 		rv = append(rv, pr)
 	}
 
-	return rv, nextPage, nil, nil
+	return rv, "", nil, nil
 }
 
 func (o *policyResourceType) Entitlements(ctx context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
@@ -91,10 +90,9 @@ func (o *policyResourceType) Entitlements(ctx context.Context, resource *v2.Reso
 
 func (o *policyResourceType) Grants(ctx context.Context, resource *v2.Resource, pt *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	policyEmployees, err := o.client.GetPolicyEmployees(ctx, resource.Id.Resource)
-	nextPage := pt.Token + "1"
 
 	if err != nil {
-		return nil, nextPage, nil, err
+		return nil, "", nil, err
 	}
 
 	var rv []*v2.Grant
@@ -110,12 +108,12 @@ func (o *policyResourceType) Grants(ctx context.Context, resource *v2.Resource, 
 		policyEmployeeCopy := policyEmployee
 		ur, err := userResource(ctx, &policyEmployeeCopy, resource.Id)
 		if err != nil {
-			return nil, nextPage, nil, err
+			return nil, "", nil, err
 		}
 
 		permissionGrant := grant.NewGrant(resource, roleName, ur.Id)
 		rv = append(rv, permissionGrant)
 	}
 
-	return rv, nextPage, nil, nil
+	return rv, "", nil, nil
 }

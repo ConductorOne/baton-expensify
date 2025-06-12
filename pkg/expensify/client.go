@@ -68,13 +68,11 @@ type PoliciesRequestBody struct {
 type PolicyListResponse struct {
 	PolicyList   []Policy `json:"policyList"`
 	ResponseCode int64    `json:"responseCode"`
-	NextPage     string   `json:"nextPage"`
 }
 
 type PolicyResponse struct {
 	PolicyInfo   map[string]Employees `json:"policyInfo"`
 	ResponseCode int64                `json:"responseCode"`
-	NextPage     string               `json:"nextPage"`
 }
 
 type Error struct {
