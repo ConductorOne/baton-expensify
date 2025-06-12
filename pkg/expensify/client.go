@@ -1,16 +1,17 @@
 package expensify
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
-	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"google.golang.org/grpc/codes"
 )
 
 const BaseUrl = "https://integrations.expensify.com/Integration-Server/ExpensifyIntegrations"
@@ -77,20 +78,12 @@ type PolicyResponse struct {
 }
 
 type Error struct {
-	ErrorMessage string `json:"responseMessage"`
-	StatusCode   int    `json:"responseCode"`
-}
-
-func (e *Error) Error() string {
-	return fmt.Sprintf("[%d] %s", e.StatusCode, e.ErrorMessage)
-}
-
-func (e *Error) Message() string {
-	return e.ErrorMessage
+	Message    string `json:"responseMessage"`
+	StatusCode int    `json:"responseCode"`
 }
 
 // GetPolicies returns policies that user is an admin of.
-func (c *Client) GetPolicies(ctx context.Context) ([]Policy, *v2.RateLimitDescription, error) {
+func (c *Client) GetPolicies(ctx context.Context) ([]Policy, error) {
 	body := PoliciesRequestBody{
 		Type: "get",
 		Credentials: Credentials{
@@ -104,17 +97,16 @@ func (c *Client) GetPolicies(ctx context.Context) ([]Policy, *v2.RateLimitDescri
 	}
 
 	var res PolicyListResponse
-	rl := &v2.RateLimitDescription{}
-	err := c.doRequest(ctx, body, &res, rl)
+	err := c.doRequest(ctx, body, &res)
 	if err != nil {
-		return nil, rl, err
+		return nil, err
 	}
 
-	return res.PolicyList, rl, nil
+	return res.PolicyList, nil
 }
 
 // GetPolicyEmployees returns employees for a single policy.
-func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]User, *v2.RateLimitDescription, error) {
+func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]User, error) {
 	var fields, policyIDs []string
 	fields = append(fields, "employees")
 	policyIDs = append(policyIDs, policyId)
@@ -132,16 +124,15 @@ func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]Use
 	}
 
 	var res PolicyResponse
-	rl := &v2.RateLimitDescription{}
-	err := c.doRequest(ctx, body, &res, rl)
+	err := c.doRequest(ctx, body, &res)
 	if err != nil {
-		return nil, rl, err
+		return nil, err
 	}
 
-	return res.PolicyInfo[policyId].Employees, rl, nil
+	return res.PolicyInfo[policyId].Employees, nil
 }
 
-func (c *Client) doRequest(ctx context.Context, body interface{}, resType interface{}, rl *v2.RateLimitDescription) error {
+func (c *Client) doRequest(ctx context.Context, body interface{}, resType interface{}) error {
 	strBody, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -150,38 +141,33 @@ func (c *Client) doRequest(ctx context.Context, body interface{}, resType interf
 	data := url.Values{}
 	data.Set("requestJobDescription", string(strBody))
 
-	apiURL, err := url.Parse(BaseUrl)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, BaseUrl, strings.NewReader(data.Encode()))
 	if err != nil {
-		return fmt.Errorf("failed to parse base URL: %w", err)
+		return err
 	}
 
-	req, err := c.httpClient.NewRequest(
-		ctx,
-		http.MethodPost,
-		apiURL,
-		uhttp.WithContentTypeFormHeader(),
-		uhttp.WithFormBody(data.Encode()),
-	)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	doOpts := []uhttp.DoOption{
-		uhttp.WithAlwaysJSONResponse(&resType),
-	}
-	if rl != nil {
-		doOpts = append(doOpts, uhttp.WithRatelimitData(rl))
-	}
-
-	resp, err := c.httpClient.Do(req, doOpts...)
-	if err != nil {
-		// If we get a rate limit error, wrap it with rate limit info and return as Unavailable
-		if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
-			return uhttp.WrapErrorsWithRateLimitInfo(codes.Unavailable, resp, fmt.Errorf("rate limit exceeded"))
-		}
 		return err
 	}
 	defer resp.Body.Close()
+
+	var (
+		buf bytes.Buffer
+		r   = io.TeeReader(resp.Body, &buf)
+	)
+
+	var errResp Error
+	if err = json.NewDecoder(r).Decode(&errResp); err != nil {
+		return err
+	} else if code := errResp.StatusCode; code != 0 && code != http.StatusOK {
+		return fmt.Errorf("error: %s", errResp.Message)
+	}
+
+	if err := json.NewDecoder(&buf).Decode(&resType); err != nil {
+		return err
+	}
 
 	return nil
 }

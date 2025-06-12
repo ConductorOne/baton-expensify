@@ -54,11 +54,9 @@ func (o *userResourceType) List(ctx context.Context, parentId *v2.ResourceId, to
 		return nil, nextPage, nil, nil
 	}
 
-	var annos annotations.Annotations
-	users, rl, err := o.client.GetPolicyEmployees(ctx, parentId.Resource)
+	users, err := o.client.GetPolicyEmployees(ctx, parentId.Resource)
 	if err != nil {
-		annos.WithRateLimiting(rl)
-		return nil, nextPage, annos, fmt.Errorf("expensify-connector: failed to list users: %w", err)
+		return nil, nextPage, nil, fmt.Errorf("expensify-connector: failed to list users: %w", err)
 	}
 
 	var rv []*v2.Resource
@@ -66,14 +64,12 @@ func (o *userResourceType) List(ctx context.Context, parentId *v2.ResourceId, to
 		userCopy := user
 		ur, err := userResource(ctx, &userCopy, parentId)
 		if err != nil {
-			annos.WithRateLimiting(rl)
-			return nil, nextPage, annos, err
+			return nil, nextPage, nil, err
 		}
 		rv = append(rv, ur)
 	}
 
-	annos.WithRateLimiting(rl)
-	return rv, nextPage, annos, nil
+	return rv, nextPage, nil, nil
 }
 
 func (o *userResourceType) Entitlements(_ context.Context, _ *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
