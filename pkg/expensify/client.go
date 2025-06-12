@@ -10,6 +10,7 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"google.golang.org/grpc/codes"
 )
 
 const BaseUrl = "https://integrations.expensify.com/Integration-Server/ExpensifyIntegrations"
@@ -76,12 +77,20 @@ type PolicyResponse struct {
 }
 
 type Error struct {
-	Message    string `json:"responseMessage"`
-	StatusCode int    `json:"responseCode"`
+	ErrorMessage string `json:"responseMessage"`
+	StatusCode   int    `json:"responseCode"`
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("[%d] %s", e.StatusCode, e.ErrorMessage)
+}
+
+func (e *Error) Message() string {
+	return e.ErrorMessage
 }
 
 // GetPolicies returns policies that user is an admin of.
-func (c *Client) GetPolicies(ctx context.Context) ([]Policy, error) {
+func (c *Client) GetPolicies(ctx context.Context) ([]Policy, *v2.RateLimitDescription, error) {
 	body := PoliciesRequestBody{
 		Type: "get",
 		Credentials: Credentials{
@@ -98,14 +107,14 @@ func (c *Client) GetPolicies(ctx context.Context) ([]Policy, error) {
 	rl := &v2.RateLimitDescription{}
 	err := c.doRequest(ctx, body, &res, rl)
 	if err != nil {
-		return nil, err
+		return nil, rl, err
 	}
 
-	return res.PolicyList, nil
+	return res.PolicyList, rl, nil
 }
 
 // GetPolicyEmployees returns employees for a single policy.
-func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]User, error) {
+func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]User, *v2.RateLimitDescription, error) {
 	var fields, policyIDs []string
 	fields = append(fields, "employees")
 	policyIDs = append(policyIDs, policyId)
@@ -126,10 +135,10 @@ func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]Use
 	rl := &v2.RateLimitDescription{}
 	err := c.doRequest(ctx, body, &res, rl)
 	if err != nil {
-		return nil, err
+		return nil, rl, err
 	}
 
-	return res.PolicyInfo[policyId].Employees, nil
+	return res.PolicyInfo[policyId].Employees, rl, nil
 }
 
 func (c *Client) doRequest(ctx context.Context, body interface{}, resType interface{}, rl *v2.RateLimitDescription) error {
@@ -157,9 +166,20 @@ func (c *Client) doRequest(ctx context.Context, body interface{}, resType interf
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req, uhttp.WithAlwaysJSONResponse(&resType), uhttp.WithRatelimitData(rl))
+	doOpts := []uhttp.DoOption{
+		uhttp.WithAlwaysJSONResponse(&resType),
+	}
+	if rl != nil {
+		doOpts = append(doOpts, uhttp.WithRatelimitData(rl))
+	}
+
+	resp, err := c.httpClient.Do(req, doOpts...)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		// If we get a rate limit error, wrap it with rate limit info and return as Unavailable
+		if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
+			return uhttp.WrapErrorsWithRateLimitInfo(codes.Unavailable, resp, fmt.Errorf("rate limit exceeded"))
+		}
+		return err
 	}
 	defer resp.Body.Close()
 

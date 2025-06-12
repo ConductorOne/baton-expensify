@@ -46,11 +46,13 @@ func (as *Expensify) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error
 
 // Validate hits the Expensify API to validate API credentials.
 func (as *Expensify) Validate(ctx context.Context) (annotations.Annotations, error) {
-	_, err := as.client.GetPolicies(ctx)
+	_, rl, err := as.client.GetPolicies(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("expensify-connector: %w", err)
 	}
-	return nil, nil
+	var annos annotations.Annotations
+	annos.WithRateLimiting(rl)
+	return annos, nil
 }
 
 // New returns the Expensify connector.
