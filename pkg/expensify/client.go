@@ -9,22 +9,30 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
 
 const BaseUrl = "https://integrations.expensify.com/Integration-Server/ExpensifyIntegrations"
 
 type Client struct {
-	httpClient        *http.Client
+	httpClient        *uhttp.BaseHttpClient
 	partnerUserID     string
 	partnerUserSecret string
 }
 
-func NewClient(partnerUserID string, partnerUserSecret string, httpClient *http.Client) *Client {
+func NewClient(ctx context.Context, partnerUserID string, partnerUserSecret string) (*Client, error) {
+	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http client: %w", err)
+	}
+
 	return &Client{
 		partnerUserID:     partnerUserID,
 		partnerUserSecret: partnerUserSecret,
-		httpClient:        httpClient,
-	}
+		httpClient:        uhttp.NewBaseHttpClient(httpClient),
+	}, nil
 }
 
 type Credentials struct {
@@ -91,10 +99,11 @@ func (c *Client) GetPolicies(ctx context.Context) ([]Policy, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return res.PolicyList, nil
 }
 
-// GetPolicyEmployees returns employees for a signle policy.
+// GetPolicyEmployees returns employees for a single policy.
 func (c *Client) GetPolicyEmployees(ctx context.Context, policyId string) ([]User, error) {
 	var fields, policyIDs []string
 	fields = append(fields, "employees")
@@ -129,6 +138,7 @@ func (c *Client) doRequest(ctx context.Context, body interface{}, resType interf
 
 	data := url.Values{}
 	data.Set("requestJobDescription", string(strBody))
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, BaseUrl, strings.NewReader(data.Encode()))
 	if err != nil {
 		return err

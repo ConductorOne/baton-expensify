@@ -57,6 +57,7 @@ func policyResource(ctx context.Context, policy expensify.Policy) (*v2.Resource,
 func (o *policyResourceType) List(ctx context.Context, resourceId *v2.ResourceId, pt *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var rv []*v2.Resource
 	policies, err := o.client.GetPolicies(ctx)
+
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -89,6 +90,7 @@ func (o *policyResourceType) Entitlements(ctx context.Context, resource *v2.Reso
 
 func (o *policyResourceType) Grants(ctx context.Context, resource *v2.Resource, pt *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	policyEmployees, err := o.client.GetPolicyEmployees(ctx, resource.Id.Resource)
+
 	if err != nil {
 		return nil, "", nil, err
 	}
