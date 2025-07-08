@@ -157,6 +157,7 @@ type Server struct {
 	unaryInterceptor grpc.UnaryServerInterceptor
 
 	services map[string]*serviceInfo
+	Init     func(s *Server, skipValidation bool) error
 }
 
 func MetadataForRequest(req *Request) metadata.MD {
@@ -213,6 +214,19 @@ func (s *Server) Handler(ctx context.Context, req *Request) (*Response, error) {
 	if err != nil {
 		return ErrorResponse(err), nil
 	}
+
+	if s.Init != nil {
+		isConfigValidationRequest := serviceName == "c1.connector.v2.ConnectorService" && methodName == "Validate"
+		err := s.Init(s, isConfigValidationRequest)
+		if err != nil {
+			return ErrorResponse(err), nil
+		}
+		// only fetch the config once, but at least once
+		if !isConfigValidationRequest {
+			s.Init = nil
+		}
+	}
+
 	service, ok := s.services[serviceName]
 	if !ok {
 		return ErrorResponse(status.Errorf(codes.Unimplemented, "unknown service %v", serviceName)), nil
@@ -289,9 +303,10 @@ func (s *Server) RegisterService(sd *grpc.ServiceDesc, ss any) {
 func (s *Server) register(sd *grpc.ServiceDesc, ss any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.services[sd.ServiceName]; ok {
-		panic(fmt.Sprintf("grpc: Server.RegisterService found duplicate service registration for %q", sd.ServiceName))
-	}
+
+	// if _, ok := s.services[sd.ServiceName]; ok {
+	// 	panic(fmt.Sprintf("grpc: Server.RegisterService found duplicate service registration for %q", sd.ServiceName))
+	// }
 	info := &serviceInfo{
 		serviceImpl: ss,
 		methods:     make(map[string]*grpc.MethodDesc),
