@@ -2,7 +2,6 @@ package retry
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"time"
 
@@ -53,20 +52,14 @@ func (r *Retryer) ShouldWaitAndRetry(ctx context.Context, err error) bool {
 		r.attempts = 0
 		return true
 	}
-
-	l := ctxzap.Extract(ctx)
-	statusCode := status.Code(err)
-	fmt.Printf("RETRY CHECK: error=%v, status=%s, attempts=%d\n", err, statusCode.String(), r.attempts)
-
-	if statusCode != codes.Unavailable && statusCode != codes.DeadlineExceeded {
-		fmt.Printf("RETRY DECISION: NOT retryable (status %s not in [Unavailable, DeadlineExceeded])\n", statusCode.String())
+	if status.Code(err) != codes.Unavailable && status.Code(err) != codes.DeadlineExceeded {
 		return false
 	}
 
 	r.attempts++
+	l := ctxzap.Extract(ctx)
 
 	if r.maxAttempts > 0 && r.attempts > r.maxAttempts {
-		fmt.Printf("RETRY DECISION: NOT retrying (max attempts %d reached)\n", r.maxAttempts)
 		l.Warn("max attempts reached", zap.Error(err), zap.Uint("max_attempts", r.maxAttempts))
 		return false
 	}
@@ -107,7 +100,6 @@ func (r *Retryer) ShouldWaitAndRetry(ctx context.Context, err error) bool {
 		wait = r.maxDelay
 	}
 
-	fmt.Printf("RETRY DECISION: WILL retry after %v (attempt %d)\n", wait, r.attempts)
 	l.Warn("retrying operation", zap.Error(err), zap.Duration("wait", wait))
 
 	for {

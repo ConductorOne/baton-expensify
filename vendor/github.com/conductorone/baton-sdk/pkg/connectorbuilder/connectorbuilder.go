@@ -977,31 +977,12 @@ func (b *builderImpl) Validate(ctx context.Context, request *v2.ConnectorService
 	ctx, span := tracer.Start(ctx, "builderImpl.Validate")
 	defer span.End()
 
-	l := ctxzap.Extract(ctx)
-
-	retryer := retry.NewRetryer(ctx, retry.RetryConfig{
-		MaxAttempts:  0, // 0 means no limit - retry indefinitely
-		InitialDelay: 1 * time.Second,
-		MaxDelay:     0,
-	})
-
-	for {
-		annos, err := b.cb.Validate(ctx)
-		if err == nil {
-			l.Info("validation successful")
-			return &v2.ConnectorServiceValidateResponse{Annotations: annos}, nil
-		}
-
-		// Add debugging
-		l.Info("validation error", zap.Error(err), zap.String("status_code", status.Code(err).String()))
-
-		if retryer.ShouldWaitAndRetry(ctx, err) {
-			l.Info("retrying validation")
-			continue
-		}
-		l.Error("error: validate failed", zap.Error(err))
-		return nil, fmt.Errorf("error: validate failed: %w", err)
+	annos, err := b.cb.Validate(ctx)
+	if err != nil {
+		return nil, err
 	}
+
+	return &v2.ConnectorServiceValidateResponse{Annotations: annos}, nil
 }
 
 func (b *builderImpl) Grant(ctx context.Context, request *v2.GrantManagerServiceGrantRequest) (*v2.GrantManagerServiceGrantResponse, error) {
