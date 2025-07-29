@@ -988,6 +988,7 @@ func (b *builderImpl) Validate(ctx context.Context, request *v2.ConnectorService
 	for {
 		annos, err := b.cb.Validate(ctx)
 		if err == nil {
+			l.Info("validation successful")
 			return &v2.ConnectorServiceValidateResponse{Annotations: annos}, nil
 		}
 

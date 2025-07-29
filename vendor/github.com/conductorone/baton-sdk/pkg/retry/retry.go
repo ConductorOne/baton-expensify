@@ -54,6 +54,7 @@ func (r *Retryer) ShouldWaitAndRetry(ctx context.Context, err error) bool {
 		return true
 	}
 
+	l := ctxzap.Extract(ctx)
 	statusCode := status.Code(err)
 	fmt.Printf("RETRY CHECK: error=%v, status=%s, attempts=%d\n", err, statusCode.String(), r.attempts)
 
@@ -63,7 +64,6 @@ func (r *Retryer) ShouldWaitAndRetry(ctx context.Context, err error) bool {
 	}
 
 	r.attempts++
-	l := ctxzap.Extract(ctx)
 
 	if r.maxAttempts > 0 && r.attempts > r.maxAttempts {
 		fmt.Printf("RETRY DECISION: NOT retrying (max attempts %d reached)\n", r.maxAttempts)
