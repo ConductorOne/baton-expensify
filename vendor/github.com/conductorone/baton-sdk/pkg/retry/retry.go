@@ -48,19 +48,22 @@ func (r *Retryer) ShouldWaitAndRetry(ctx context.Context, err error) bool {
 	ctx, span := tracer.Start(ctx, "retry.ShouldWaitAndRetry")
 	defer span.End()
 
+	l := ctxzap.Extract(ctx)
+
 	if err == nil {
+		l.Debug("no error, resetting attempts")
 		r.attempts = 0
 		return true
 	}
 	if status.Code(err) != codes.Unavailable && status.Code(err) != codes.DeadlineExceeded {
+		l.Debug("not retrying, not unavailable or deadline exceeded", zap.Error(err), zap.Uint("max_attempts", r.maxAttempts), zap.Uint("attempts", r.attempts))
 		return false
 	}
 
 	r.attempts++
-	l := ctxzap.Extract(ctx)
 
 	if r.maxAttempts > 0 && r.attempts > r.maxAttempts {
-		l.Warn("max attempts reached", zap.Error(err), zap.Uint("max_attempts", r.maxAttempts))
+		l.Warn("max attempts reached", zap.Error(err), zap.Uint("max_attempts", r.maxAttempts), zap.Uint("attempts", r.attempts))
 		return false
 	}
 
