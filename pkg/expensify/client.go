@@ -12,6 +12,7 @@ import (
 
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"google.golang.org/grpc/codes"
 )
 
 const BaseUrl = "https://integrations.expensify.com/Integration-Server/ExpensifyIntegrations"
@@ -159,11 +160,51 @@ func (c *Client) doRequest(ctx context.Context, body interface{}, resType interf
 	var errResp Error
 	if err = json.NewDecoder(r).Decode(&errResp); err != nil {
 		return err
-	} else if code := errResp.StatusCode; code != 0 && code != http.StatusOK {
-		return fmt.Errorf("error: %s", errResp.Message)
 	}
 
-	if err := json.NewDecoder(&buf).Decode(&resType); err != nil {
+	// Expensify always returns HTTP 200, but uses responseCode in the JSON body for errors.
+	// See: https://integrations.expensify.com/Integration-Server/doc/#basic-format
+	if code := errResp.StatusCode; code != 0 && code != http.StatusOK {
+		apiErr := fmt.Errorf("%s", errResp.Message)
+		msgLower := strings.ToLower(errResp.Message)
+
+		// Priority 1: Check for authentication errors by message content.
+		// Expensify returns "Authentication error" (responseCode 404) for invalid credentials.
+		if strings.Contains(msgLower, "authentication error") {
+			return uhttp.WrapErrors(codes.Unauthenticated, fmt.Sprintf("expensify-connector: %s", errResp.Message), apiErr)
+		}
+
+		// Priority 2: Classify by Expensify's responseCode.
+		switch code {
+		case 401:
+			// Unauthorized - authentication required
+			return uhttp.WrapErrors(codes.Unauthenticated, fmt.Sprintf("expensify-connector: %s", errResp.Message), apiErr)
+		case 403:
+			// Forbidden - user is not an admin of the policy
+			return uhttp.WrapErrors(codes.PermissionDenied, fmt.Sprintf("expensify-connector: %s", errResp.Message), apiErr)
+		case 404:
+			// Expensify uses 404 for authentication errors (already handled above) and not found
+			return uhttp.WrapErrors(codes.NotFound, fmt.Sprintf("expensify-connector: %s", errResp.Message), apiErr)
+		case 410:
+			// Validation error - invalid policyID, missing required parameters, etc.
+			// Common messages: "'xxx' is not a valid policy ID", "Required parameter 'policyIDList' is missing"
+			return uhttp.WrapErrors(codes.InvalidArgument, fmt.Sprintf("expensify-connector: %s", errResp.Message), apiErr)
+		case 429:
+			// Rate limit exceeded (5 requests/10s or 20 requests/60s per documentation)
+			return uhttp.WrapErrors(codes.ResourceExhausted, fmt.Sprintf("expensify-connector: %s", errResp.Message), apiErr)
+		case 500:
+			// Internal server error from Expensify - treat as service unavailable
+			return uhttp.WrapErrors(codes.Unavailable, fmt.Sprintf("expensify-connector: %s", errResp.Message), apiErr)
+		case 503:
+			// Service unavailable
+			return uhttp.WrapErrors(codes.Unavailable, fmt.Sprintf("expensify-connector: %s", errResp.Message), apiErr)
+		default:
+			// Unknown error code
+			return uhttp.WrapErrors(codes.Unknown, fmt.Sprintf("expensify-connector: %s", errResp.Message), apiErr)
+		}
+	}
+
+	if err := json.NewDecoder(&buf).Decode(resType); err != nil {
 		return err
 	}
 
