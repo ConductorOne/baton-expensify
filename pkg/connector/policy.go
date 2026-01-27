@@ -7,6 +7,7 @@ import (
 	"github.com/conductorone/baton-expensify/pkg/expensify"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -15,6 +16,8 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
+
+var _ connectorbuilder.ResourceSyncer = (*policyResourceType)(nil)
 
 var roles = map[string]string{
 	"admin":   "admin",
