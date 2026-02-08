@@ -6,6 +6,7 @@ import "reflect"
 type Expensify struct {
 	PartnerUserId string `mapstructure:"partner-user-id"`
 	PartnerUserSecret string `mapstructure:"partner-user-secret"`
+	BaseUrl string `mapstructure:"base-url"`
 }
 
 func (c *Expensify) findFieldByTag(tagValue string) (any, bool) {

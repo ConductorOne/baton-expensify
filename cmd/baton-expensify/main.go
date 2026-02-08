@@ -44,7 +44,7 @@ func main() {
 func getConnector(ctx context.Context, ec *cfg.Expensify) (types.ConnectorServer, error) {
 	l := ctxzap.Extract(ctx)
 
-	cb, err := connector.New(ctx, ec.PartnerUserId, ec.PartnerUserSecret)
+	cb, err := connector.New(ctx, ec.PartnerUserId, ec.PartnerUserSecret, ec.BaseUrl)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err
