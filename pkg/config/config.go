@@ -25,6 +25,7 @@ var (
 		"base-url",
 		field.WithDescription("Override the Expensify API URL (for testing)"),
 		field.WithHidden(true),
+		field.WithExportTarget(field.ExportTargetCLIOnly),
 	)
 )
 
