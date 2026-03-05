@@ -15,24 +15,30 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-const BaseUrl = "https://integrations.expensify.com/Integration-Server/ExpensifyIntegrations"
+const DefaultBaseURL = "https://integrations.expensify.com/Integration-Server/ExpensifyIntegrations"
 
 type Client struct {
 	httpClient        *uhttp.BaseHttpClient
 	partnerUserID     string
 	partnerUserSecret string
+	baseURL           string
 }
 
-func NewClient(ctx context.Context, partnerUserID string, partnerUserSecret string) (*Client, error) {
+func NewClient(ctx context.Context, partnerUserID string, partnerUserSecret string, baseURL string) (*Client, error) {
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http client: %w", err)
+	}
+
+	if baseURL == "" {
+		baseURL = DefaultBaseURL
 	}
 
 	return &Client{
 		partnerUserID:     partnerUserID,
 		partnerUserSecret: partnerUserSecret,
 		httpClient:        uhttp.NewBaseHttpClient(httpClient),
+		baseURL:           baseURL,
 	}, nil
 }
 
@@ -140,7 +146,7 @@ func (c *Client) doRequest(ctx context.Context, body interface{}, resType interf
 	data := url.Values{}
 	data.Set("requestJobDescription", string(strBody))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, BaseUrl, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}

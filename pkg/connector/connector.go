@@ -54,8 +54,8 @@ func (as *Expensify) Validate(ctx context.Context) (annotations.Annotations, err
 }
 
 // New returns the Expensify connector.
-func New(ctx context.Context, partnerUserID string, partnerUserSecret string) (*Expensify, error) {
-	client, err := expensify.NewClient(ctx, partnerUserID, partnerUserSecret)
+func New(ctx context.Context, partnerUserID string, partnerUserSecret string, baseURL string) (*Expensify, error) {
+	client, err := expensify.NewClient(ctx, partnerUserID, partnerUserSecret, baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create expensify client: %w", err)
 	}
