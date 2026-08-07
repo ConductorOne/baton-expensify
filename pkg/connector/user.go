@@ -31,9 +31,7 @@ func userResource(ctx context.Context, user *expensify.User, parentResourceID *v
 	}
 
 	userTraitOptions := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
 		rs.WithEmail(user.Email, true),
-		rs.WithStatus(v2.UserTrait_Status_STATUS_ENABLED),
 	}
 
 	ret, err := rs.NewUserResource(
@@ -42,6 +40,8 @@ func userResource(ctx context.Context, user *expensify.User, parentResourceID *v
 		// there is no userId in response
 		user.Email,
 		userTraitOptions,
+		rs.WithResourceProfile(profile),
+		rs.WithResourceStatus(v2.Status_RESOURCE_STATUS_ENABLED, ""),
 		rs.WithParentResourceID(parentResourceID),
 	)
 	if err != nil {
