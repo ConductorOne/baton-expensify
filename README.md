@@ -21,7 +21,7 @@ baton resources
 ## docker
 
 ```
-docker run --rm -v $(pwd):/out -e BATON_PARTNER_USER_ID=partnerUserId BATON_PARTNER_USER_SECRET=partnerUserSecret ghcr.io/conductorone/baton-expensify:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_PARTNER_USER_ID=partnerUserId BATON_PARTNER_USER_SECRET=partnerUserSecret public.ecr.aws/conductorone/baton-expensify:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
